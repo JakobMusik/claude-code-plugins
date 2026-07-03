@@ -3,7 +3,8 @@ name: notify
 description: >-
   Set up phone push notifications (via ntfy.sh) for Claude Code on this machine, so the user
   gets pinged when Claude stops and is awaiting them, asks them a multiple-choice question, or
-  hits a permission prompt — with the session name as the notification text. Use when the user wants to
+  hits a permission prompt — titled with the session name and directory, with Claude's latest
+  reply as the message. Use when the user wants to
   "set up notifications", "notify me when Claude finishes / asks me something / needs permission",
   mentions "ntfy" or "push notifications", "alert me when the agent is done", or wants to
   (re)configure, change, or test the notification topic. The Stop / AskUserQuestion /
@@ -18,17 +19,22 @@ Ping the user's phone when a Claude Code session needs them. Three moments are w
 **session-wide hooks bundled with this skill** (the `notify` plugin's
 `hooks/hooks.json`):
 
-| Event | Fires when | ntfy title / emoji / priority |
-|-------|-----------|-------------------------------|
-| `Stop` | Claude finished its turn and is awaiting the user | "Done - awaiting you" ✅ high |
-| `PreToolUse` (matcher `AskUserQuestion`) | Claude is asking the user a multiple-choice question | "Question for you" ❓ max |
-| `PermissionRequest` | Claude is blocked needing a tool approved | "Permission needed" 🔒 max |
+| Event | Fires when | emoji / priority |
+|-------|-----------|------------------|
+| `Stop` | Claude finished its turn and is awaiting the user | ✅ high |
+| `PreToolUse` (matcher `AskUserQuestion`) | Claude is asking the user a multiple-choice question | ❓ max |
+| `PermissionRequest` | Claude is blocked needing a tool approved | 🔒 max |
 
-The notification **body is the session name** — whatever the session list shows. The script
-reads it from the transcript by precedence: the title you set with `/rename` (e.g.
-`notify-skill-creation`) wins; else the auto-generated summary title; else the early agent name;
-else the working-directory basename. A mid-session `/rename` is reflected, and it never sends a
-stale auto name over one you set yourself.
+Every notification carries the same shape; the emoji (ntfy Tags) and priority above tell the
+events apart:
+
+- **Title = `<session name>@<cwd>`.** The session name is read from the transcript by precedence —
+  the title you set with `/rename` (e.g. `notify-skill-creation`) wins, else the auto-generated
+  summary title, else the early agent name; it never sends a stale auto name over one you set
+  yourself, and a mid-session `/rename` is reflected. `<cwd>` is the working-directory basename,
+  so the title reads e.g. `fix-auth-bug@myapp` — *which* task in *which* project at a glance.
+- **Body = the first few lines of Claude's latest reply** (the last assistant message's text).
+  If that turn carried no prose (a bare tool call), the body falls back to the title.
 
 Because these are **plugin** hooks (not skill-frontmatter hooks, which would only live for one
 turn), they fire on every Stop / AskUserQuestion / permission event for the whole session and in
@@ -81,7 +87,8 @@ chmod +x "$SCRIPT"
    hooks take effect now. (Editing `hooks/hooks.json` later also requires `/reload-plugins`.)
 
 Finish by summarizing: the topic + subscribe URL, that a test was sent, the three wired events,
-and that the message body is the session name.
+and the notification shape — title `<session name>@<cwd>`, body the first lines of Claude's
+latest reply.
 
 ## Prerequisites
 

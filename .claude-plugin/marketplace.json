@@ -8,7 +8,7 @@
     {
       "name": "notify",
       "source": "./plugins/notify",
-      "description": "Phone push notifications (via ntfy.sh) when Claude Code stops and is awaiting you, asks you a multiple-choice question, or hits a permission prompt. The notification body is the session name."
+      "description": "Phone push notifications (via ntfy.sh) when Claude Code stops and is awaiting you, asks you a multiple-choice question, or hits a permission prompt. The title is '<session name>@<cwd>' and the body is Claude's latest reply."
     },
     {
       "name": "clean-remote",

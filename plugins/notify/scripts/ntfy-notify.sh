@@ -7,9 +7,13 @@
 #     askuserquestion     Claude is asking you a multiple-choice question     (PreToolUse: AskUserQuestion)
 #     permission_request  Claude is blocked, needing you to approve a tool    (PermissionRequest)
 #
-# The notification BODY is the SESSION NAME (the title from /rename, shown in the
-# session list, e.g. "notify-skill-creation"). Which event fired is conveyed by the
-# ntfy Title, Tags (emoji) and Priority — not the body. Reads the hook JSON on stdin.
+# For a session event the notification is composed from the transcript as:
+#     Title:  "<session name>@<cwd>" — the /rename title if set, else the
+#             auto-generated summary title, joined with the working-dir basename.
+#     Body:   the first few lines of Claude's latest reply (the last assistant
+#             message's text), or the title if that turn carried no prose.
+# Which event fired is still encoded by the Tags (emoji) and Priority. Reads the
+# hook JSON on stdin.
 #
 # Config subcommands (used by SKILL.md setup, not by the hooks):
 #     set-topic [TOPIC]   write the private ntfy topic (generates a random one if omitted)
@@ -62,33 +66,66 @@ post_bg() {  # post_bg <title> <priority> <tags> <body>
 #     agent-name    .agentName    the early auto name, before an ai-title exists
 # We mirror what the session list shows by PRECEDENCE, not document order:
 # a /rename wins over an ai-title wins over an agent-name (taking the last of
-# each kind, so a mid-session /rename is reflected). Order matters because the
-# transcript writes an agent-name right AFTER a custom-title, so a naive
-# "last record" pick would clobber the user's /rename with a stale auto name.
-# Falls back to the working directory's basename, then a generic label.
-session_name() {
-    local input="" transcript cwd name base
+# each kind). Order matters because the transcript writes an agent-name record
+# right AFTER a custom-title, so a naive "last record" pick would clobber the
+# user's /rename with a stale auto name. May be empty (brand-new session); the
+# caller then falls back to the cwd basename.
+session_title() {  # session_title <transcript>
+    [ -n "${1:-}" ] && [ -f "$1" ] || return 0
+    jq -rn '
+        reduce inputs as $r ({};
+          if   $r.type=="custom-title" and (($r.customTitle // "") != "") then .c = $r.customTitle
+          elif $r.type=="ai-title"     and (($r.aiTitle    // "") != "") then .a = $r.aiTitle
+          elif $r.type=="agent-name"   and (($r.agentName  // "") != "") then .g = $r.agentName
+          else . end)
+        | .c // .a // .g // empty' "$1" 2>/dev/null
+}
+
+# Body: the first few lines of Claude's most recent reply — the text blocks of
+# the last assistant message (thinking / tool_use blocks are skipped). Empty when
+# the latest turns carried no prose (e.g. a bare tool call); the caller then falls
+# back to the title so the notification is never blank.
+REPLY_MAX_LINES=4
+REPLY_MAX_CHARS=500
+latest_reply() {  # latest_reply <transcript>
+    local text
+    [ -n "${1:-}" ] && [ -f "$1" ] || return 0
+    text="$(jq -rn '
+        [ inputs
+          | select(.type=="assistant" and .message.role=="assistant")
+          | ([.message.content[]? | select(.type=="text") | .text] | join("\n"))
+          | select(. != null and (gsub("\\s"; "") | length > 0))
+        ] | last // ""' "$1" 2>/dev/null)"
+    [ -n "$text" ] || return 0
+    printf '%s' "$text" | awk -v m="$REPLY_MAX_LINES" -v c="$REPLY_MAX_CHARS" '
+        NF { line[++n] = $0 } n >= m { exit }
+        END {
+            body = ""
+            for (i = 1; i <= n; i++) body = body (i > 1 ? "\n" : "") line[i]
+            if (length(body) > c) body = substr(body, 1, c) "\342\200\246"   # ellipsis
+            printf "%s", body
+        }'
+}
+
+# Read the hook JSON once, compose "<name>@<cwd>" for the title and the latest
+# reply for the body, and fire. Priority + emoji tags (args) still mark the event.
+notify_event() {  # notify_event <priority> <tags>
+    local input="" transcript cwd base name title body
     [ -t 0 ] || input="$(cat)"
     transcript="$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)"
     cwd="$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)"
     [ -n "$cwd" ] || cwd="$PWD"
-    name=""
-    if [ -n "$transcript" ] && [ -f "$transcript" ]; then
-        name="$(jq -rn '
-            reduce inputs as $r ({};
-              if   $r.type=="custom-title" and (($r.customTitle // "") != "") then .c = $r.customTitle
-              elif $r.type=="ai-title"     and (($r.aiTitle    // "") != "") then .a = $r.aiTitle
-              elif $r.type=="agent-name"   and (($r.agentName  // "") != "") then .g = $r.agentName
-              else . end)
-            | .c // .a // .g // empty' \
-                "$transcript" 2>/dev/null)"
+    base="$(basename "$cwd" 2>/dev/null)"; case "$base" in "/"|".") base="" ;; esac
+    name="$(session_title "$transcript")"
+    if   [ -n "$name" ] && [ -n "$base" ]; then title="${name}@${base}"
+    elif [ -n "$name" ];                   then title="$name"
+    elif [ -n "$base" ];                   then title="$base"
+    else                                        title="claude session"
     fi
-    if [ -z "$name" ]; then
-        base="$(basename "$cwd" 2>/dev/null)"
-        case "$base" in ""|"/"|".") ;; *) name="$base" ;; esac
-    fi
-    [ -n "$name" ] || name="claude session"
-    printf '%s' "$name"
+    title="$(printf '%s' "$title" | tr -d '\r\n')"   # Title is an HTTP header: single line
+    body="$(latest_reply "$transcript")"
+    [ -n "$body" ] || body="$title"
+    post_bg "$title" "$1" "$2" "$body"
 }
 
 STAGE="${1:-}"
@@ -118,12 +155,12 @@ case "$STAGE" in
             && echo "sent test notification to https://ntfy.sh/${topic}" \
             || { echo "failed to reach https://ntfy.sh/${topic}" >&2; exit 1; }
         ;;
-    stop)               post_bg "Done - awaiting you" "high" "white_check_mark" "$(session_name)" ;;
-    askuserquestion)    post_bg "Question for you"    "max"  "question"          "$(session_name)" ;;
-    permission_request) post_bg "Permission needed"   "max"  "lock"              "$(session_name)" ;;
+    stop)               notify_event "high" "white_check_mark" ;;
+    askuserquestion)    notify_event "max"  "question" ;;
+    permission_request) notify_event "max"  "lock" ;;
     "")
         echo "usage: ntfy-notify.sh {stop|askuserquestion|permission_request|set-topic|show-topic|test}" >&2
         exit 2
         ;;
-    *) post_bg "claude: $STAGE" "default" "information_source" "$(session_name)" ;;
+    *) notify_event "default" "information_source" ;;
 esac

@@ -6,7 +6,7 @@ catalog entry.
 
 | Plugin | What it does |
 |--------|--------------|
-| **[notify](./plugins/notify)** | Phone push notifications (via [ntfy.sh](https://ntfy.sh)) when a session stops and is awaiting you, asks you a multiple-choice question, or hits a permission prompt — the notification body is the **session name**, so you know which session at a glance. |
+| **[notify](./plugins/notify)** | Phone push notifications (via [ntfy.sh](https://ntfy.sh)) when a session stops and is awaiting you, asks you a multiple-choice question, or hits a permission prompt — titled **`<session name>@<project>`** with Claude's **latest reply** as the body, so you know which session and what it said at a glance. |
 | **[clean-remote](./plugins/clean-remote)** | Keep planning and agent-helper files tracked locally with full history while the **public remote stays clean** — one scrubbed commit per publish, enforced by a `pre-push` hook so a stray push can't leak. |
 
 ## Install

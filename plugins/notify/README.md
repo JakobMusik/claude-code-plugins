@@ -1,28 +1,32 @@
 # notify
 
 Phone push notifications for [Claude Code](https://code.claude.com), delivered through
-[ntfy.sh](https://ntfy.sh). Get pinged the moment a session needs you — and because **the
-notification text is the session name**, you know *which* session at a glance.
+[ntfy.sh](https://ntfy.sh). Get pinged the moment a session needs you — the notification is
+titled **`<session name>@<project>`** and its body is **Claude's latest reply**, so you know
+*which* session and *what it said* without opening your laptop.
 
 ## What it does
-Three moments are wired as **session-wide hooks** that ship with the plugin:
+Three moments are wired as **session-wide hooks** that ship with the plugin. Every one sends the
+same shape; the emoji and priority tell them apart:
 
-| Event | Fires when | Notification |
-|-------|-----------|--------------|
-| `Stop` | Claude finished its turn and is awaiting you | ✅ **Done - awaiting you** (high) |
-| `PreToolUse` (`AskUserQuestion`) | Claude is asking you a multiple-choice question | ❓ **Question for you** (max) |
-| `PermissionRequest` | Claude is blocked, needing you to approve a tool | 🔒 **Permission needed** (max) |
+| Event | Fires when | Emoji / priority |
+|-------|-----------|------------------|
+| `Stop` | Claude finished its turn and is awaiting you | ✅ high |
+| `PreToolUse` (`AskUserQuestion`) | Claude is asking you a multiple-choice question | ❓ max |
+| `PermissionRequest` | Claude is blocked, needing you to approve a tool | 🔒 max |
 
-Which event fired is carried by the **title, emoji, and priority**; the **body is the session
-name**, read from the transcript by precedence:
+**Title — `<session name>@<cwd>`.** The session name is read from the transcript by precedence:
 
 1. the title you set with `/rename` (e.g. `fix-auth-bug`),
 2. else the auto-generated summary title shown in the session list,
-3. else the early auto agent-name,
-4. else the working-directory basename.
+3. else the early auto agent-name.
 
-A mid-session `/rename` is reflected, and an explicit rename always wins over an auto-generated
-name.
+`<cwd>` is the working-directory basename, so the title reads e.g. `fix-auth-bug@myapp`. A
+mid-session `/rename` is reflected, and an explicit rename always wins over an auto name.
+
+**Body — Claude's latest reply.** The first few lines of the last assistant message (long
+replies are truncated with an `…`). If that turn was a bare tool call with no prose, the body
+falls back to the title.
 
 `AskUserQuestion` is wired on `PreToolUse` (not `PermissionRequest`, which never fires for it),
 so the ping goes out the instant Claude poses the question — while it's still waiting on you.
@@ -74,9 +78,10 @@ That's the whole setup. Re-run `/notify` anytime to see, change, or re-test the 
 - The plugin's `hooks/hooks.json` wires the three events to `scripts/ntfy-notify.sh` via
   `${CLAUDE_PLUGIN_ROOT}`. These are **plugin** hooks, so they fire session-wide and in every
   future session — unlike skill *frontmatter* hooks, which Claude Code scopes to a single turn.
-- `ntfy-notify.sh` reads the hook JSON on stdin, derives the session name from the transcript,
-  and POSTs it to `https://ntfy.sh/<your-topic>` with a title/emoji/priority per event. The
-  curl is detached with tight timeouts, so it never delays Claude's turn.
+- `ntfy-notify.sh` reads the hook JSON on stdin, finds the transcript, and from it composes the
+  title (`<session name>@<cwd>`) and body (Claude's latest reply), then POSTs to
+  `https://ntfy.sh/<your-topic>` with the event's emoji and priority. The curl is detached with
+  tight timeouts, so it never delays Claude's turn.
 
 ## Privacy
 ntfy topics are **world-readable** — the topic name is the *only* thing keeping your messages
