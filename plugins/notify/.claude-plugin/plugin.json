@@ -1,7 +1,7 @@
 {
   "name": "notify",
-  "version": "0.1.4",
-  "description": "Push a phone notification (via ntfy.sh) when Claude Code stops, asks you a multiple-choice question, or hits a permission prompt. The title is '<session name>@<cwd>' and the body is Claude's latest reply. Bundles session-wide Stop / AskUserQuestion / PermissionRequest hooks; run /notify once to configure the ntfy topic. Also bundles an optional macOS desktop receiver (desktop/claude-code-ntfy.sh) that turns the same topic into native notification banners.",
+  "version": "0.1.5",
+  "description": "Push a phone notification (via ntfy.sh) when Claude Code stops, asks you a multiple-choice question, or hits a permission prompt. The title is '<session name>@<cwd>' and the body is Claude's latest reply. Bundles session-wide Stop / AskUserQuestion / PermissionRequest hooks; run /notify once to configure the ntfy topic. Also bundles an optional macOS desktop receiver (desktop/claude-code-ntfy.sh) that turns the same topic into native notification banners; /notify bakes your topic into your copy as its default subscription.",
   "author": {
     "name": "jakobmusik"
   }
