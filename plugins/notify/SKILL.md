@@ -106,7 +106,10 @@ chmod +x "$SCRIPT"
    ```
 
    Copying it out matters: the plugin folder is version-stamped and is replaced on every update, so
-   edits made in place would be lost. Tell the user they can then edit that copy however they like,
+   edits made in place would be lost. Mention that running the *bundled* script in place needs no
+   arguments — it auto-subscribes to the configured topic, reading `../.config/topic`
+   relative to itself — while their copy starts empty (they pass the topic as an argument, or set
+   `NTFY_TOPIC` / `NTFY_TOPIC_FILE`). Tell the user they can then edit that copy however they like,
    and — to run it as a bare command from anywhere — put it on their `PATH` themselves (drop it in
    a PATH dir, symlink it, or add its folder to `PATH`). It needs `ntfy` + `jq`, and
    `terminal-notifier` (preferred) or the built-in `osascript`. Full usage and run instructions are

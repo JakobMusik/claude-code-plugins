@@ -103,6 +103,13 @@ it out rather than editing in place:
     # or put it on your PATH to use as a bare command (see desktop/README.md)
     ~/claude-code-ntfy.sh your-topic
 
+Run it **in place** instead — straight out of the plugin folder — and it needs no arguments: on
+start it reads the `/notify` topic from `../.config/topic` *relative to itself* and auto-subscribes
+(a copy sits outside the plugin folder, so it can't see that file — pass the topic, or set
+`NTFY_TOPIC` / `NTFY_TOPIC_FILE`, the same overrides the sender honors):
+
+    "${CLAUDE_PLUGIN_ROOT}/desktop/claude-code-ntfy.sh"   # auto-subscribes to the /notify topic
+
 Type more topics at its prompt to add listeners; `quit` / Ctrl-C tears them all down cleanly.
 
 **Dependencies (different from the sender):** the phone hooks send with plain `curl`, but the

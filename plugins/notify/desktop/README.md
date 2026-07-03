@@ -16,8 +16,9 @@ ntfy topic  ──▶  ntfy sub (this script)  ──▶  parse JSON  ──▶ 
 
 Nothing is installed for you. Copy the script out of the plugin folder into a location you own,
 then edit it however you like. This matters because the plugin folder is **version-stamped** and
-replaced on every update — edits made in place would be lost. On macOS, `/notify` (optional step 6)
-just hands you this same command.
+replaced on every update — edits made in place would be lost. (*Running* it in place is fine — and
+has a perk: it finds your configured topic by itself, see [Usage](#usage) — just don't *edit* it
+there.) On macOS, `/notify` (optional step 6) just hands you this same command.
 
 ```bash
 # from an installed plugin, $CLAUDE_PLUGIN_ROOT points at the current version dir
@@ -54,7 +55,7 @@ Enter — it spawns a background listener and adds it to a live list. Add as man
 
 | At the `ntfy>` prompt | Does |
 |-----------------------|------|
-| `<topic \| url>`       | start listening (this is the topic you configured with `/notify`) |
+| `<topic \| url>`       | start listening (e.g. the `/notify` topic, if it wasn't auto-loaded) |
 | `list` (or blank Enter) | show the numbered list with `live` / `DEAD` status |
 | `rm <n>`              | stop and remove link *n* |
 | `help`                | command reference |
@@ -62,16 +63,31 @@ Enter — it spawns a background listener and adds it to a live list. Add as man
 
 Preload links as arguments too: `claude-code-ntfy my-topic another-topic`.
 
-To point it at the same channel the `notify` plugin sends to, just pass that topic — it's whatever
-`/notify` configured. Look it up any time with the sender's `ntfy-notify.sh show-topic` (the topic
-now lives inside the plugin folder, so there's no stable path to `cat`):
+**The `/notify` topic loads itself when the script runs from inside the plugin folder.** On start
+the script looks for the sender's topic file at `../.config/topic` *relative to its own location*
+(symlinks resolved, so any `$PWD` works) and auto-subscribes to it — the same file `/notify`
+writes, which sits next to `desktop/` in the plugin root:
 
 ```bash
-claude-code-ntfy your-topic        # e.g. claude-code-xxxxxxxx
+"${CLAUDE_PLUGIN_ROOT:-.}/desktop/claude-code-ntfy.sh"   # auto-subscribes to the /notify topic
+```
+
+`$NTFY_TOPIC` or `$NTFY_TOPIC_FILE` override that lookup — the same resolution order the sender
+uses. A personal copy lives outside the plugin folder, so it finds no config and starts empty;
+point it at the same channel by passing the topic (look it up any time with the sender's
+`ntfy-notify.sh show-topic`) or by exporting one of those variables:
+
+```bash
+claude-code-ntfy your-topic                     # e.g. claude-code-xxxxxxxx
+NTFY_TOPIC_FILE=~/my/topicfile claude-code-ntfy # or keep your own topic file
 ```
 
 ## How it works
 
+- On start it resolves the notify plugin's configured topic — `$NTFY_TOPIC`, else the file named
+  by `$NTFY_TOPIC_FILE`, else `../.config/topic` relative to the script's real (symlink-resolved)
+  location — and auto-subscribes when one is found. The file's content is validated (topic charset
+  or an `http(s)://` URL), so an unrelated file that happens to sit at that path is ignored.
 - Each link runs `ntfy sub <url> | parse` in **its own process group**, so the `ntfy` process and
   its JSON parser are torn down together. A `trap` on `INT`/`TERM`/`EXIT` kills every listener's
   group on quit, Ctrl-C, Ctrl-D, or `kill` — no orphaned `ntfy sub` processes. (A `kill -9` of the

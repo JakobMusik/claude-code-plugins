@@ -16,6 +16,12 @@
 #   claude-code-ntfy -h | --help
 #
 # Notes:
+#   * On start the script auto-subscribes to the notify plugin's configured
+#     topic, if it finds one. Resolution mirrors the sender (first hit wins):
+#     $NTFY_TOPIC, $NTFY_TOPIC_FILE, then ../.config/topic RELATIVE TO THIS
+#     SCRIPT (symlinks resolved) — the file `/notify` writes, which sits next
+#     to desktop/ inside the plugin folder. A copy of the script living
+#     outside the plugin folder finds no such file and starts empty.
 #   * A "link" may be a bare topic (e.g. claude-code-usyawcrtus07) — it's
 #     assumed to live on https://ntfy.sh — or a full http(s):// URL for a
 #     self-hosted server.
@@ -23,6 +29,7 @@
 #     JSON parser are killed together on teardown; nothing is left orphaned.
 
 DEFAULT_SERVER="https://ntfy.sh"
+PLACEHOLDER="REPLACE_ME_WITH_A_PRIVATE_NTFY_TOPIC"
 LOG="${TMPDIR:-/tmp}/claude-code-ntfy.$$.log"
 
 # Parallel arrays — one slot per active listener.
@@ -230,6 +237,51 @@ shutdown() {
 }
 
 # ---------------------------------------------------------------------------
+# configured-topic auto-load
+#
+# The notify plugin's sender stores its topic at <plugin>/.config/topic, and
+# this script ships in <plugin>/desktop/, so when run in place that same file
+# sits at ../.config/topic relative to the script — findable from any $PWD.
+# Resolution order mirrors the sender: $NTFY_TOPIC, $NTFY_TOPIC_FILE, then the
+# relative file. A copy outside the plugin folder has no plugin root above it,
+# so nothing is found and nothing is auto-added.
+# ---------------------------------------------------------------------------
+
+script_dir() {
+  # Directory of the real script file, following symlinks (e.g. a PATH
+  # symlink to a copy), so ../.config resolves from the actual file.
+  local src="${BASH_SOURCE[0]:-$0}" dir tgt
+  while [ -L "$src" ]; do
+    dir="$(cd -- "$(dirname -- "$src")" 2>/dev/null && pwd)" || break
+    tgt="$(readlink "$src" 2>/dev/null)"
+    [ -n "$tgt" ] || break
+    case "$tgt" in /*) src="$tgt" ;; *) src="$dir/$tgt" ;; esac
+  done
+  cd -- "$(dirname -- "$src")" 2>/dev/null && pwd
+}
+
+auto_add_configured() {
+  local topic file dir
+  if [ -n "${NTFY_TOPIC:-}" ]; then
+    topic="$(trim "$NTFY_TOPIC")"
+    case "$topic" in ''|"$PLACEHOLDER") return 0 ;; esac
+    say '  + topic from $NTFY_TOPIC'
+    add_listener "$topic"
+    return 0
+  fi
+  file="${NTFY_TOPIC_FILE:-$(script_dir)/../.config/topic}"
+  [ -f "$file" ] || return 0
+  topic="$(tr -d ' \t\r\n' < "$file" 2>/dev/null)"
+  case "$topic" in ''|"$PLACEHOLDER") return 0 ;; esac
+  # Accept only what the sender can have written (or a full URL) — refuse to
+  # subscribe to garbage if some unrelated file happens to match the path.
+  printf '%s' "$topic" | grep -qE '^([A-Za-z0-9_-]{1,64}|https?://[^[:space:]]+)$' || return 0
+  dir="$(cd -- "$(dirname -- "$file")" 2>/dev/null && pwd)" && file="$dir/$(basename -- "$file")"
+  say_tail '  + topic from config: ' "$(tildepath "$file")"
+  add_listener "$topic"
+}
+
+# ---------------------------------------------------------------------------
 # ui
 # ---------------------------------------------------------------------------
 
@@ -298,7 +350,7 @@ case "${1:-}" in
   -h|--help)
     _w="$(tput cols 2>/dev/null)"; case "$_w" in ''|*[!0-9]*) _w=80 ;; esac
     [ "$_w" -gt 100 ] && _w=100
-    sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//' | fold -s -w "$_w"
+    awk 'NR == 1 { next } !/^#/ { exit } { sub(/^# ?/, ""); print }' "$0" | fold -s -w "$_w"
     exit 0 ;;
 esac
 
@@ -307,6 +359,7 @@ trap 'shutdown' EXIT
 
 require_deps
 print_banner
+auto_add_configured
 for a in "$@"; do
   [ -n "$a" ] && add_listener "$a"
 done
