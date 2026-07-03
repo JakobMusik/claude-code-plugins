@@ -48,9 +48,10 @@ every future session — once the plugin is loaded.
 ## What invoking `/notify` does
 
 The hooks are already declared; the only per-user setup is the **ntfy topic** (the private
-channel your phone subscribes to). Run these steps. The topic is stored in a stable user-config
-path — `${XDG_CONFIG_HOME:-~/.config}/claude-code-notify/topic` — so it is shared across every
-install method and survives plugin updates.
+channel your phone subscribes to). Run these steps. The topic is stored **inside the plugin
+folder** at `<plugin>/.config/topic` (the script derives `<plugin>` from its own location). That
+`.config/` folder is removed when the plugin is uninstalled and wiped when it's replaced on
+update, so the topic is deliberately temporary — re-run `/notify` after a reinstall.
 
 ```bash
 # ${CLAUDE_PLUGIN_ROOT} is set when this runs as a marketplace/`--plugin-dir` plugin;

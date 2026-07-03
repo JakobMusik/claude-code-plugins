@@ -1,7 +1,10 @@
 # macOS
 .DS_Store
 
-# Never commit a private ntfy topic (it lives in ~/.config, but be defensive)
+# Never commit a private ntfy topic. The notify plugin stores it inside the
+# plugin folder at plugins/notify/.config/ — which is the plugin root when the
+# plugin is loaded from this repo via `--plugin-dir`, so ignore it here.
+plugins/notify/.config/
 .ntfy-topic
 *.ntfy-topic
 

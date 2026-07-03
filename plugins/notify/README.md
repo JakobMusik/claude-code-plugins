@@ -60,9 +60,10 @@ topic** — the channel your phone subscribes to.
     /notify
 
 It generates a private `claude-code-xxxxxxxx` topic (or accepts one you name), sends a test
-notification, and prints a `https://ntfy.sh/<topic>` subscribe URL. The topic is saved to
-`${XDG_CONFIG_HOME:-~/.config}/claude-code-notify/topic` — outside the plugin dir, so it
-survives updates and reinstalls.
+notification, and prints a `https://ntfy.sh/<topic>` subscribe URL. The topic is saved **inside
+the plugin** at `<plugin>/.config/topic`, so it's self-contained: uninstalling the plugin (or a
+reinstall/update that replaces the plugin folder) removes it too — just re-run `/notify` to set
+it again.
 
 **2. Subscribe on your phone.** Open that URL in the [ntfy app](https://ntfy.sh) (iOS / Android)
 or the web client and subscribe. This is what actually delivers pushes — without it, nothing

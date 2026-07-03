@@ -23,16 +23,22 @@
 # Topic resolution (first hit wins):
 #     1. $NTFY_TOPIC
 #     2. $NTFY_TOPIC_FILE       (path override, if set)
-#     3. ${XDG_CONFIG_HOME:-~/.config}/claude-code-notify/topic   (written by `set-topic`)
-# The topic lives in a stable user-config path (NOT inside the plugin dir) so it is
-# identical whether the script runs as a hook or a plain command, and survives plugin
-# updates/reinstalls. ntfy topics are world-readable, so the topic name is the ONLY
-# privacy boundary: there is no shared default and the script refuses to POST without one.
+#     3. <plugin>/.config/topic (written by `set-topic`)
+# The topic file lives INSIDE the plugin folder — <plugin> is this script's own
+# plugin dir (scripts/..), resolved from the script's location so it is found
+# identically as a hook or as a plain command. That .config/ dir is removed when
+# the plugin is uninstalled, and wiped when the plugin is replaced on update, so
+# the topic is intentionally temporary: re-run /notify after a reinstall. ntfy
+# topics are world-readable, so the topic name is the ONLY privacy boundary:
+# there is no shared default and the script refuses to POST without one.
 
 set -u
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
-DEFAULT_TOPIC_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/claude-code-notify/topic"
+# Plugin root = this script's dir minus scripts/. Prefer the loader-provided
+# ${CLAUDE_PLUGIN_ROOT} when set; both point at the same plugin folder.
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
+DEFAULT_TOPIC_FILE="$PLUGIN_ROOT/.config/topic"
 TOPIC_FILE="${NTFY_TOPIC_FILE:-$DEFAULT_TOPIC_FILE}"
 PLACEHOLDER="REPLACE_ME_WITH_A_PRIVATE_NTFY_TOPIC"
 
