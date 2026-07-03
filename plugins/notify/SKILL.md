@@ -60,19 +60,24 @@ SCRIPT="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/skills/notify}/scripts/ntfy-notify.s
 chmod +x "$SCRIPT"
 ```
 
-1. **Check for an existing topic.** Run `"$SCRIPT" show-topic`.
-   - If it prints a topic, a topic is already configured. Report it and its subscribe URL. Keep
-     it unless the user explicitly wants a new one.
-   - If it says none is configured, configure one in step 2.
+1. **Check for an already-configured topic.** Run `"$SCRIPT" show-topic`.
+   - If it prints a topic, one is already configured — report it and its subscribe URL, and keep
+     it unless the user explicitly asks to change it. Skip to step 3.
+   - If it says none is configured, go to step 2. **Do not generate a topic yet.**
 
-2. **Configure the topic** (only if none exists, or the user wants to change it):
-   - If the user named a specific topic, use it: `"$SCRIPT" set-topic "<their-topic>"`.
-   - Otherwise generate a random private one: `"$SCRIPT" set-topic` (prints a
-     `claude-code-xxxxxxxx` topic).
+2. **Ask before generating — this is required.** When no topic is configured, you MUST first ask
+   the user whether they already have an ntfy **topic or subscribe link** they want to reuse (for
+   example one their phone already subscribes to, or one from another machine). Never auto-generate
+   a topic before asking.
+   - **If they give a topic or a link:** use it. Accept a bare topic (`my-topic`) or a full link
+     (`https://ntfy.sh/my-topic`) — from a link, take the **last path segment** as the topic — then
+     `"$SCRIPT" set-topic "<topic>"`.
+   - **Only if they say they don't have one:** generate a random private topic with
+     `"$SCRIPT" set-topic` (prints a `claude-code-xxxxxxxx` topic).
 
    > ntfy topics are **world-readable** — the topic name is the *only* thing keeping messages
-   > private. Prefer the generated random topic; never reuse a guessable/shared name. Don't post
-   > the topic anywhere public.
+   > private. If the user has no existing topic, prefer the generated random one; never invent a
+   > guessable/shared name. Don't post the topic anywhere public.
 
 3. **Tell the user to subscribe.** Give them the `https://ntfy.sh/<topic>` URL and tell them to
    subscribe to that topic in the ntfy app (iOS / Android) or the web client at that URL. Without
@@ -87,9 +92,30 @@ chmod +x "$SCRIPT"
    `/reload-plugins` (or restart Claude Code) so the Stop / AskUserQuestion / PermissionRequest
    hooks take effect now. (Editing `hooks/hooks.json` later also requires `/reload-plugins`.)
 
+6. **(Optional — macOS only) Offer the desktop receiver.** The hooks above ping the user's
+   *phone*. On macOS the same topic can *also* pop native desktop banners via the bundled
+   `claude-code-ntfy.sh` script (the plugin's `desktop/` folder). This only makes sense on macOS —
+   the banners use macOS-only tools. **Don't install anything.** Just hand the user the command to
+   copy the script out of the plugin folder into a location they control, so they can run and
+   freely customize their own copy:
+
+   ```bash
+   # copy it somewhere stable you own (pick any path), then make it executable
+   cp "${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/skills/notify}/desktop/claude-code-ntfy.sh" ~/claude-code-ntfy.sh
+   chmod +x ~/claude-code-ntfy.sh
+   ```
+
+   Copying it out matters: the plugin folder is version-stamped and is replaced on every update, so
+   edits made in place would be lost. Tell the user they can then edit that copy however they like,
+   and — to run it as a bare command from anywhere — put it on their `PATH` themselves (drop it in
+   a PATH dir, symlink it, or add its folder to `PATH`). It needs `ntfy` + `jq`, and
+   `terminal-notifier` (preferred) or the built-in `osascript`. Full usage and run instructions are
+   in the plugin's `desktop/README.md`.
+
 Finish by summarizing: the topic + subscribe URL, that a test was sent, the three wired events,
 and the notification shape — title `<session name>@<cwd>`, body the first lines of Claude's
-latest reply.
+latest reply. On macOS, if the user wants desktop banners too, point them at the copy command in
+step 6 and the plugin's `desktop/` folder.
 
 ## Prerequisites
 
@@ -110,3 +136,6 @@ latest reply.
   delete `~/.claude/skills/notify/` instead.
 - **Manual test wiring:** the hooks call `ntfy-notify.sh stop|askuserquestion|permission_request`
   with the hook JSON on stdin.
+- **Desktop receiver (macOS):** it's an unmanaged copy the user makes themselves (step 6) — re-copy
+  the script from the plugin's `desktop/` folder to pick up updates, and just delete their copy to
+  remove it. It has no hooks, so it never affects the phone notifications either way.

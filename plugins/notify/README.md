@@ -84,6 +84,36 @@ That's the whole setup. Re-run `/notify` anytime to see, change, or re-test the 
   `https://ntfy.sh/<your-topic>` with the event's emoji and priority. The curl is detached with
   tight timeouts, so it never delays Claude's turn.
 
+## Desktop notifications on macOS (optional)
+The hooks above push to your **phone**. If you also — or instead — want the pings as native
+**macOS desktop banners**, the plugin bundles a companion receiver, `claude-code-ntfy`, in
+[`desktop/`](desktop/). It subscribes to your ntfy topic(s) and turns each incoming message into a
+macOS notification (same title + body).
+
+It's a standalone script, not a hook, and nothing is installed for you. On macOS, `/notify` (its
+optional step 6) just hands you the command to **copy the script out of the plugin folder** so you
+own an editable copy — the plugin folder is version-stamped and replaced on every update, so copy
+it out rather than editing in place:
+
+    # copy it somewhere you control, then make it executable
+    cp "${CLAUDE_PLUGIN_ROOT}/desktop/claude-code-ntfy.sh" ~/claude-code-ntfy.sh
+    chmod +x ~/claude-code-ntfy.sh
+
+    # run it directly (pass the topic /notify configured — see: ntfy-notify.sh show-topic),
+    # or put it on your PATH to use as a bare command (see desktop/README.md)
+    ~/claude-code-ntfy.sh your-topic
+
+Type more topics at its prompt to add listeners; `quit` / Ctrl-C tears them all down cleanly.
+
+**Dependencies (different from the sender):** the phone hooks send with plain `curl`, but the
+desktop receiver *subscribes* via `ntfy sub`, so it needs the **[`ntfy` CLI](https://docs.ntfy.sh/install/)
+installed** — `brew install ntfy`. It also needs `jq`, plus `terminal-notifier` (`brew install
+terminal-notifier`, preferred) or the built-in `osascript`. Full details in
+[`desktop/README.md`](desktop/README.md).
+
+> Copy it again after a plugin update — the plugin's cache path is version-stamped, so don't
+> symlink into it.
+
 ## Privacy
 ntfy topics are **world-readable** — the topic name is the *only* thing keeping your messages
 private. `/notify` generates a random `claude-code-xxxxxxxx` topic by default; keep it secret and
@@ -95,6 +125,10 @@ the hooks are harmless no-ops before setup. The topic file is never committed.
 - `jq` on `PATH` to read the session name from the transcript — without it the body falls back to
   the working-directory name.
 - Claude Code with plugin support.
+
+These cover the phone hooks. The optional **macOS desktop receiver** has *additional* deps — most
+notably the **`ntfy` CLI** (`brew install ntfy`), since it subscribes with `ntfy sub` rather than
+sending with `curl` — see [Desktop notifications on macOS](#desktop-notifications-on-macos-optional).
 
 ## Managing it
 The script also runs standalone for topic management (`$SCRIPT` is
@@ -117,9 +151,12 @@ The script also runs standalone for topic management (`$SCRIPT` is
 ```
 plugins/notify/
 ├── .claude-plugin/plugin.json
-├── hooks/hooks.json          # Stop / PreToolUse(AskUserQuestion) / PermissionRequest
-├── scripts/ntfy-notify.sh    # posts to ntfy; body = session name
-├── SKILL.md                  # the /notify skill: configure topic, test, guide
+├── hooks/hooks.json               # Stop / PreToolUse(AskUserQuestion) / PermissionRequest
+├── scripts/ntfy-notify.sh         # sender: posts to ntfy; title=session, body=latest reply
+├── desktop/                       # optional macOS receiver (subscribes → native banners)
+│   ├── claude-code-ntfy.sh        #   the standalone command
+│   └── README.md
+├── SKILL.md                       # the /notify skill: configure topic, test, guide
 └── README.md
 ```
 
