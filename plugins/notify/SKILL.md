@@ -97,26 +97,33 @@ chmod +x "$SCRIPT"
 6. **(Optional — macOS only) Offer the desktop receiver.** The hooks above ping the user's
    *phone*. On macOS the same topic can *also* pop native desktop banners via the bundled
    `claude-code-ntfy.sh` script (the plugin's `desktop/` folder). This only makes sense on macOS —
-   the banners use macOS-only tools. If the user wants it, set their copy up: copy the script out
-   of the plugin folder into a location they control (default `~/claude-code-ntfy.sh`; ask if they
-   have a preference), make it executable, and **bake the configured topic into the copy** as its
-   default subscription — the pristine script reads no config and subscribes to nothing until a
-   link is passed or baked in:
+   the banners use macOS-only tools. If the user wants it, set their copy up — but **check for an
+   existing copy first** (default `~/claude-code-ntfy.sh`; ask if they have a preference):
 
-   ```bash
-   cp "${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/skills/notify}/desktop/claude-code-ntfy.sh" ~/claude-code-ntfy.sh
-   chmod +x ~/claude-code-ntfy.sh
-   # bake the topic in — substitute the topic from step 1/2 (show-topic prints it)
-   sed -i '' 's/^DEFAULT_LINKS=()$/DEFAULT_LINKS=("<topic>")/' ~/claude-code-ntfy.sh
-   ```
+   - **No copy yet:** copy the script out of the plugin folder, make it executable, and **bake the
+     configured topic into the copy** as its default subscription — the pristine script reads no
+     config and subscribes to nothing until a link is passed or baked in:
+
+     ```bash
+     cp "${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/skills/notify}/desktop/claude-code-ntfy.sh" ~/claude-code-ntfy.sh
+     chmod +x ~/claude-code-ntfy.sh
+     # bake the topic in — substitute the topic from step 1/2 (show-topic prints it)
+     sed -i '' 's/^DEFAULT_LINKS=(.*)$/DEFAULT_LINKS=("<topic>")/' ~/claude-code-ntfy.sh
+     ```
+
+   - **Copy already exists** (e.g. re-running after re-configuring the topic): do **not** `cp`
+     over it — it may carry the user's own edits. Run only the `sed` line; its pattern matches an
+     already-baked `DEFAULT_LINKS=("old-topic")` too, so it re-points the copy to the current
+     topic in place. Replace the file wholesale only if the user explicitly wants a fresh copy
+     (e.g. to pick up upstream script changes after a plugin update) — warn that this discards
+     their edits, then run the full block.
 
    Copying it out matters: the plugin folder is version-stamped and is replaced on every update, so
-   edits made in place would be lost (and after an update the user re-runs this step, which bakes
-   the topic in again). Tell the user they can then edit that copy however they like — including
-   the `DEFAULT_LINKS` line — and, to run it as a bare command from anywhere, put it on their
-   `PATH` themselves (drop it in a PATH dir, symlink it, or add its folder to `PATH`). It needs
-   `ntfy` + `jq`, and `terminal-notifier` (preferred) or the built-in `osascript`. Full usage and
-   run instructions are in the plugin's `desktop/README.md`.
+   edits made in place would be lost. Tell the user they can then edit that copy however they like —
+   including the `DEFAULT_LINKS` line — and, to run it as a bare command from anywhere, put it on
+   their `PATH` themselves (drop it in a PATH dir, symlink it, or add its folder to `PATH`). It
+   needs `ntfy` + `jq`, and `terminal-notifier` (preferred) or the built-in `osascript`. Full usage
+   and run instructions are in the plugin's `desktop/README.md`.
 
 Finish by summarizing: the topic + subscribe URL, that a test was sent, the three wired events,
 and the notification shape — title `<session name>@<cwd>`, body the first lines of Claude's

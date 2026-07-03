@@ -71,6 +71,9 @@ copy needs no arguments; edit the line yourself any time (bare topic or full URL
 DEFAULT_LINKS=("claude-code-xxxxxxxx")
 ```
 
+Re-running `/notify` (say, after changing the topic) re-points that one line in place — it won't
+overwrite your copy or touch your other edits.
+
 To point it at the `/notify` channel by hand instead, pass the topic — look it up any time with
 the sender's `ntfy-notify.sh show-topic`:
 
