@@ -16,6 +16,10 @@
 #   claude-code-ntfy -h | --help
 #
 # Notes:
+#   * DEFAULT_LINKS (just below) holds link(s) auto-added at startup. The
+#     pristine script ships with it empty — it reads no config on its own.
+#     The /notify skill bakes your configured topic in when it sets up your
+#     copy; edit the line freely.
 #   * A "link" may be a bare topic (e.g. claude-code-usyawcrtus07) — it's
 #     assumed to live on https://ntfy.sh — or a full http(s):// URL for a
 #     self-hosted server.
@@ -24,6 +28,10 @@
 
 DEFAULT_SERVER="https://ntfy.sh"
 LOG="${TMPDIR:-/tmp}/claude-code-ntfy.$$.log"
+
+# Default subscription link(s), auto-added at startup — bare topic or full
+# URL, one per entry. Empty by default; /notify fills this in on your copy.
+DEFAULT_LINKS=()
 
 # Parallel arrays — one slot per active listener.
 URLS=()     # normalized subscription URL
@@ -298,7 +306,7 @@ case "${1:-}" in
   -h|--help)
     _w="$(tput cols 2>/dev/null)"; case "$_w" in ''|*[!0-9]*) _w=80 ;; esac
     [ "$_w" -gt 100 ] && _w=100
-    sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//' | fold -s -w "$_w"
+    awk 'NR == 1 { next } !/^#/ { exit } { sub(/^# ?/, ""); print }' "$0" | fold -s -w "$_w"
     exit 0 ;;
 esac
 
@@ -307,7 +315,7 @@ trap 'shutdown' EXIT
 
 require_deps
 print_banner
-for a in "$@"; do
+for a in "${DEFAULT_LINKS[@]}" "$@"; do
   [ -n "$a" ] && add_listener "$a"
 done
 repl

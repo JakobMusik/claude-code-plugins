@@ -14,10 +14,10 @@ ntfy topic  ──▶  ntfy sub (this script)  ──▶  parse JSON  ──▶ 
 
 ## Get your own copy
 
-Nothing is installed for you. Copy the script out of the plugin folder into a location you own,
-then edit it however you like. This matters because the plugin folder is **version-stamped** and
-replaced on every update — edits made in place would be lost. On macOS, `/notify` (optional step 6)
-just hands you this same command.
+Copy the script out of the plugin folder into a location you own, then edit it however you like.
+This matters because the plugin folder is **version-stamped** and replaced on every update — edits
+made in place would be lost. On macOS, `/notify` (optional step 6) does this for you and **bakes
+your configured topic into the copy** as its default subscription (see [Usage](#usage)).
 
 ```bash
 # from an installed plugin, $CLAUDE_PLUGIN_ROOT points at the current version dir
@@ -54,7 +54,7 @@ Enter — it spawns a background listener and adds it to a live list. Add as man
 
 | At the `ntfy>` prompt | Does |
 |-----------------------|------|
-| `<topic \| url>`       | start listening (this is the topic you configured with `/notify`) |
+| `<topic \| url>`       | start listening (in addition to any `DEFAULT_LINKS`) |
 | `list` (or blank Enter) | show the numbered list with `live` / `DEAD` status |
 | `rm <n>`              | stop and remove link *n* |
 | `help`                | command reference |
@@ -62,9 +62,17 @@ Enter — it spawns a background listener and adds it to a live list. Add as man
 
 Preload links as arguments too: `claude-code-ntfy my-topic another-topic`.
 
-To point it at the same channel the `notify` plugin sends to, just pass that topic — it's whatever
-`/notify` configured. Look it up any time with the sender's `ntfy-notify.sh show-topic` (the topic
-now lives inside the plugin folder, so there's no stable path to `cat`):
+**Default subscriptions.** The `DEFAULT_LINKS` array near the top of the script is auto-added at
+startup. The pristine script ships with it empty — it reads no config and subscribes to nothing on
+its own. When `/notify` sets up your copy it bakes your configured topic in there, so running your
+copy needs no arguments; edit the line yourself any time (bare topic or full URL, one per entry):
+
+```bash
+DEFAULT_LINKS=("claude-code-xxxxxxxx")
+```
+
+To point it at the `/notify` channel by hand instead, pass the topic — look it up any time with
+the sender's `ntfy-notify.sh show-topic`:
 
 ```bash
 claude-code-ntfy your-topic        # e.g. claude-code-xxxxxxxx
@@ -72,6 +80,8 @@ claude-code-ntfy your-topic        # e.g. claude-code-xxxxxxxx
 
 ## How it works
 
+- On start it adds a listener for every entry in `DEFAULT_LINKS` (empty until `/notify` or you
+  fill it in), then for every command-line argument — duplicates are skipped.
 - Each link runs `ntfy sub <url> | parse` in **its own process group**, so the `ntfy` process and
   its JSON parser are torn down together. A `trap` on `INT`/`TERM`/`EXIT` kills every listener's
   group on quit, Ctrl-C, Ctrl-D, or `kill` — no orphaned `ntfy sub` processes. (A `kill -9` of the

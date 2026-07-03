@@ -90,10 +90,10 @@ The hooks above push to your **phone**. If you also — or instead — want the 
 [`desktop/`](desktop/). It subscribes to your ntfy topic(s) and turns each incoming message into a
 macOS notification (same title + body).
 
-It's a standalone script, not a hook, and nothing is installed for you. On macOS, `/notify` (its
-optional step 6) just hands you the command to **copy the script out of the plugin folder** so you
-own an editable copy — the plugin folder is version-stamped and replaced on every update, so copy
-it out rather than editing in place:
+It's a standalone script, not a hook. On macOS, `/notify` (its optional step 6) offers to set it
+up: it **copies the script out of the plugin folder** so you own an editable copy — the plugin
+folder is version-stamped and replaced on every update, so it's copied out rather than edited in
+place:
 
     # copy it somewhere you control, then make it executable
     cp "${CLAUDE_PLUGIN_ROOT}/desktop/claude-code-ntfy.sh" ~/claude-code-ntfy.sh
@@ -102,6 +102,11 @@ it out rather than editing in place:
     # run it directly (pass the topic /notify configured — see: ntfy-notify.sh show-topic),
     # or put it on your PATH to use as a bare command (see desktop/README.md)
     ~/claude-code-ntfy.sh your-topic
+
+When `/notify` sets the receiver up it also **bakes your configured topic into the copy** as its
+default subscription (the `DEFAULT_LINKS` array at the top of the script), so your copy then runs
+with no arguments. The pristine script reads no config and subscribes to nothing on its own — pass
+a topic or edit `DEFAULT_LINKS` yourself.
 
 Type more topics at its prompt to add listeners; `quit` / Ctrl-C tears them all down cleanly.
 

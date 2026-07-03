@@ -61,8 +61,10 @@ chmod +x "$SCRIPT"
 ```
 
 1. **Check for an already-configured topic.** Run `"$SCRIPT" show-topic`.
-   - If it prints a topic, one is already configured — report it and its subscribe URL, and keep
-     it unless the user explicitly asks to change it. Skip to step 3.
+   - If it prints a topic, one is already configured — this is a re-run. Ask the user whether to
+     keep it or re-configure. If they keep it (the default), hand them the stored topic and its
+     `https://ntfy.sh/<topic>` subscribe link, then skip to step 3. If they want to re-configure,
+     go to step 2.
    - If it says none is configured, go to step 2. **Do not generate a topic yet.**
 
 2. **Ask before generating — this is required.** When no topic is configured, you MUST first ask
@@ -95,22 +97,26 @@ chmod +x "$SCRIPT"
 6. **(Optional — macOS only) Offer the desktop receiver.** The hooks above ping the user's
    *phone*. On macOS the same topic can *also* pop native desktop banners via the bundled
    `claude-code-ntfy.sh` script (the plugin's `desktop/` folder). This only makes sense on macOS —
-   the banners use macOS-only tools. **Don't install anything.** Just hand the user the command to
-   copy the script out of the plugin folder into a location they control, so they can run and
-   freely customize their own copy:
+   the banners use macOS-only tools. If the user wants it, set their copy up: copy the script out
+   of the plugin folder into a location they control (default `~/claude-code-ntfy.sh`; ask if they
+   have a preference), make it executable, and **bake the configured topic into the copy** as its
+   default subscription — the pristine script reads no config and subscribes to nothing until a
+   link is passed or baked in:
 
    ```bash
-   # copy it somewhere stable you own (pick any path), then make it executable
    cp "${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/skills/notify}/desktop/claude-code-ntfy.sh" ~/claude-code-ntfy.sh
    chmod +x ~/claude-code-ntfy.sh
+   # bake the topic in — substitute the topic from step 1/2 (show-topic prints it)
+   sed -i '' 's/^DEFAULT_LINKS=()$/DEFAULT_LINKS=("<topic>")/' ~/claude-code-ntfy.sh
    ```
 
    Copying it out matters: the plugin folder is version-stamped and is replaced on every update, so
-   edits made in place would be lost. Tell the user they can then edit that copy however they like,
-   and — to run it as a bare command from anywhere — put it on their `PATH` themselves (drop it in
-   a PATH dir, symlink it, or add its folder to `PATH`). It needs `ntfy` + `jq`, and
-   `terminal-notifier` (preferred) or the built-in `osascript`. Full usage and run instructions are
-   in the plugin's `desktop/README.md`.
+   edits made in place would be lost (and after an update the user re-runs this step, which bakes
+   the topic in again). Tell the user they can then edit that copy however they like — including
+   the `DEFAULT_LINKS` line — and, to run it as a bare command from anywhere, put it on their
+   `PATH` themselves (drop it in a PATH dir, symlink it, or add its folder to `PATH`). It needs
+   `ntfy` + `jq`, and `terminal-notifier` (preferred) or the built-in `osascript`. Full usage and
+   run instructions are in the plugin's `desktop/README.md`.
 
 Finish by summarizing: the topic + subscribe URL, that a test was sent, the three wired events,
 and the notification shape — title `<session name>@<cwd>`, body the first lines of Claude's
