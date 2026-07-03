@@ -25,7 +25,7 @@ reflected.
 1. Push the marketplace repo to GitHub (see [Publish](#publish-your-copy)), then in Claude Code:
 
    ```
-   /plugin marketplace add <your-github-user>/claude-code-plugins
+   /plugin marketplace add JakobMusik/claude-code-plugins
    /plugin install notify@jakobmusik
    ```
 

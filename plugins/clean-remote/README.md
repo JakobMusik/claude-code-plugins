@@ -30,9 +30,9 @@ never both (a gitignored path is never committed, so there's no history for `pub
 [`claude-code-plugins`](../../) repo, whose root `.claude-plugin/marketplace.json` catalogs it.
 Add the marketplace once, then install this plugin.
 
-**From the hosted repo** (replace `<your-github-user>` with wherever you host it):
+**From the hosted repo:**
 
-    /plugin marketplace add <your-github-user>/claude-code-plugins
+    /plugin marketplace add JakobMusik/claude-code-plugins
     /plugin install clean-remote@jakobmusik
 
 **From a local clone** — add the marketplace repo, then install:

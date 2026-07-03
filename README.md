@@ -1,85 +1,81 @@
-# jakobmusik — Claude Code plugins
+# claude-code-plugins
 
-A small **marketplace** of [Claude Code](https://code.claude.com) plugins, in one repo. Each
-plugin is self-contained under [`plugins/`](./plugins); the catalog at
-[`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json) lists them all. Adding a
-plugin is just a new folder plus one catalog entry — see [Add a plugin](#add-a-plugin).
+A personal **marketplace** of [Claude Code](https://code.claude.com) plugins, kept in one repo.
+Add the marketplace once and install any plugin from it; new plugins are just a folder plus a
+catalog entry.
 
-## Plugins
-
-| Plugin | What it does | Docs |
-|--------|--------------|------|
-| **notify** | Phone push notifications (via [ntfy.sh](https://ntfy.sh)) when a session stops and awaits you, asks a multiple-choice question, or hits a permission prompt. The notification body is the session name. | [plugins/notify](./plugins/notify) |
-| **clean-remote** | Keep planning/agent-helper files tracked locally with full history while publishing one clean, scrubbed commit to a public remote; a pre-push hook enforces it. | [plugins/clean-remote](./plugins/clean-remote) |
+| Plugin | What it does |
+|--------|--------------|
+| **[notify](./plugins/notify)** | Phone push notifications (via [ntfy.sh](https://ntfy.sh)) when a session stops and is awaiting you, asks you a multiple-choice question, or hits a permission prompt — the notification body is the **session name**, so you know which session at a glance. |
+| **[clean-remote](./plugins/clean-remote)** | Keep planning and agent-helper files tracked locally with full history while the **public remote stays clean** — one scrubbed commit per publish, enforced by a `pre-push` hook so a stray push can't leak. |
 
 ## Install
 
-Add this repo as a marketplace once, then install any plugin from it. Replace
-`<your-github-user>` with wherever you host this repo (the repo doubles as its own marketplace).
+Add this repo as a marketplace, then install whichever plugins you want. Each installs and
+updates independently.
 
 ```
-/plugin marketplace add <your-github-user>/claude-code-plugins
+/plugin marketplace add JakobMusik/claude-code-plugins
 /plugin install notify@jakobmusik
 /plugin install clean-remote@jakobmusik
 ```
 
-Or add it straight from a local clone:
+`jakobmusik` is the **marketplace name** (from [`marketplace.json`](./.claude-plugin/marketplace.json));
+the part before `@` is the plugin name. Prefer a local clone? Point the marketplace at the
+directory instead:
 
 ```
 /plugin marketplace add /path/to/claude-code-plugins
 /plugin install notify@jakobmusik
 ```
 
-`jakobmusik` is the **marketplace name** (from `marketplace.json`); the part before `@` is the
-plugin name. Each plugin installs and updates independently.
+Each plugin has its own setup — see its README: [notify](./plugins/notify/README.md) ·
+[clean-remote](./plugins/clean-remote/README.md).
 
-## Repository layout
+## Layout
 
 ```
 claude-code-plugins/
 ├── .claude-plugin/
-│   └── marketplace.json          # the catalog: one entry per plugin
+│   └── marketplace.json          # the catalog — one entry per plugin
 ├── plugins/
 │   ├── notify/
 │   │   ├── .claude-plugin/plugin.json
 │   │   ├── SKILL.md              # the /notify skill
 │   │   ├── hooks/hooks.json      # Stop / AskUserQuestion / PermissionRequest
-│   │   ├── scripts/
-│   │   └── README.md
-│   ├── clean-remote/
-│   │   ├── .claude-plugin/plugin.json
-│   │   ├── skills/<skill>/SKILL.md   # setup, publish, sync, doctor, …
-│   │   ├── scripts/
-│   │   └── README.md
-│   └── README.md                 # index of the plugins
-├── LICENSE
-└── README.md
+│   │   └── scripts/
+│   └── clean-remote/
+│       ├── .claude-plugin/plugin.json
+│       ├── skills/<skill>/SKILL.md   # setup · target · publish · scrub-refs · sync · doctor · uninstall
+│       └── scripts/
+└── LICENSE
 ```
 
-Inside each plugin, the component folders (`skills/`, `hooks/`, `commands/`, `agents/`,
+Inside a plugin, the component folders (`skills/`, `hooks/`, `commands/`, `agents/`,
 `scripts/`) live at the **plugin root** — only `plugin.json` goes in `.claude-plugin/`. This
-mirrors the layout used by [`anthropics/claude-code`](https://github.com/anthropics/claude-code/tree/main/plugins).
+mirrors [`anthropics/claude-code`](https://github.com/anthropics/claude-code/tree/main/plugins),
+the canonical multi-plugin layout.
 
 ## Add a plugin
 
-1. Create `plugins/<your-plugin>/.claude-plugin/plugin.json` with at least `name` and
-   `description` (add `version`, `author` as you like — each plugin versions independently).
-2. Add whatever the plugin ships alongside it: `skills/<name>/SKILL.md`, `hooks/hooks.json`,
-   `commands/*.md`, `agents/*.md`, `scripts/`. Reference bundled files with
-   `${CLAUDE_PLUGIN_ROOT}` so paths resolve under the plugin loader.
-3. Append one entry to `.claude-plugin/marketplace.json`:
+1. Create `plugins/<name>/.claude-plugin/plugin.json` with at least `name` and `description`
+   (add `version` and `author` as you like — each plugin versions independently).
+2. Add what it ships alongside: `skills/<name>/SKILL.md`, `hooks/hooks.json`, `commands/*.md`,
+   `agents/*.md`, `scripts/`. Reference bundled files with `${CLAUDE_PLUGIN_ROOT}` so paths
+   resolve under the plugin loader.
+3. Append an entry to [`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json):
 
    ```json
    {
-     "name": "<your-plugin>",
-     "source": "./plugins/<your-plugin>",
+     "name": "<name>",
+     "source": "./plugins/<name>",
      "description": "One line on what it does."
    }
    ```
-4. Add a row to the table above and a `plugins/<your-plugin>/README.md`.
-5. Validate locally: `/plugin marketplace add /path/to/claude-code-plugins` then
-   `/plugin install <your-plugin>@jakobmusik`.
+4. Add a row to the table above and a `plugins/<name>/README.md`.
+5. Test before pushing: `/plugin marketplace add /path/to/claude-code-plugins`, then
+   `/plugin install <name>@jakobmusik`.
 
 ## License
 
-See [LICENSE](./LICENSE). Individual plugins may carry their own notices in their folders.
+[MIT](./LICENSE). Individual plugins may carry their own notices in their folders.
