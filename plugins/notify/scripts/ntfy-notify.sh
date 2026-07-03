@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ntfy-notify.sh — push Claude Code hook events to ntfy.sh as phone notifications.
 #
-# Bundled with the `notify` skills-dir plugin (~/.claude/skills/notify/). The
-# plugin's hooks/hooks.json calls this on three session events:
+# Bundled with the `notify` plugin. The plugin's hooks/hooks.json invokes this
+# (via ${CLAUDE_PLUGIN_ROOT}) on three session events:
 #     stop                Claude finished its turn and is awaiting you        (Stop)
 #     askuserquestion     Claude is asking you a multiple-choice question     (PreToolUse: AskUserQuestion)
 #     permission_request  Claude is blocked, needing you to approve a tool    (PermissionRequest)
@@ -55,10 +55,17 @@ post_bg() {  # post_bg <title> <priority> <tags> <body>
         --data-binary @- --connect-timeout 3 --max-time 8 >/dev/null 2>&1 & ) &
 }
 
-# The user-assigned session name is NOT in the hook payload; it lives in the
-# transcript as the latest custom-title / agent-name record (a mid-session
-# /rename is reflected because we take the last one). Falls back to the working
-# directory's basename, then a generic label.
+# The session's display name is NOT in the hook payload; it lives in the
+# transcript, which records three kinds of title over the session's life:
+#     custom-title  .customTitle  what the user set with /rename
+#     ai-title      .aiTitle      the auto-generated summary shown in the list
+#     agent-name    .agentName    the early auto name, before an ai-title exists
+# We mirror what the session list shows by PRECEDENCE, not document order:
+# a /rename wins over an ai-title wins over an agent-name (taking the last of
+# each kind, so a mid-session /rename is reflected). Order matters because the
+# transcript writes an agent-name right AFTER a custom-title, so a naive
+# "last record" pick would clobber the user's /rename with a stale auto name.
+# Falls back to the working directory's basename, then a generic label.
 session_name() {
     local input="" transcript cwd name base
     [ -t 0 ] || input="$(cat)"
@@ -67,9 +74,14 @@ session_name() {
     [ -n "$cwd" ] || cwd="$PWD"
     name=""
     if [ -n "$transcript" ] && [ -f "$transcript" ]; then
-        name="$(jq -r 'select(.type=="custom-title" or .type=="agent-name")
-                       | .customTitle // .agentName // empty' \
-                "$transcript" 2>/dev/null | tail -n1)"
+        name="$(jq -rn '
+            reduce inputs as $r ({};
+              if   $r.type=="custom-title" and (($r.customTitle // "") != "") then .c = $r.customTitle
+              elif $r.type=="ai-title"     and (($r.aiTitle    // "") != "") then .a = $r.aiTitle
+              elif $r.type=="agent-name"   and (($r.agentName  // "") != "") then .g = $r.agentName
+              else . end)
+            | .c // .a // .g // empty' \
+                "$transcript" 2>/dev/null)"
     fi
     if [ -z "$name" ]; then
         base="$(basename "$cwd" 2>/dev/null)"

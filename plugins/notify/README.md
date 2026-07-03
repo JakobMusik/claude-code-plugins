@@ -1,10 +1,11 @@
-# claude-notify
+# notify
 
 Phone push notifications for [Claude Code](https://code.claude.com), delivered through
-[ntfy.sh](https://ntfy.sh). Get pinged when a session needs you — **the notification text is
-the session name**, so you know *which* session at a glance.
+[ntfy.sh](https://ntfy.sh). Get pinged the moment a session needs you — and because **the
+notification text is the session name**, you know *which* session at a glance.
 
-Three moments are wired as **session-wide hooks**:
+## What it does
+Three moments are wired as **session-wide hooks** that ship with the plugin:
 
 | Event | Fires when | Notification |
 |-------|-----------|--------------|
@@ -12,112 +13,109 @@ Three moments are wired as **session-wide hooks**:
 | `PreToolUse` (`AskUserQuestion`) | Claude is asking you a multiple-choice question | ❓ **Question for you** (max) |
 | `PermissionRequest` | Claude is blocked, needing you to approve a tool | 🔒 **Permission needed** (max) |
 
-The message **body is the session name** — the title you set with `/rename` (e.g.
-`fix-auth-bug`), shown in the session list. If a session was never named, it falls back to the
-working-directory name. It's read from the session transcript, so a mid-session `/rename` is
-reflected.
+Which event fired is carried by the **title, emoji, and priority**; the **body is the session
+name**, read from the transcript by precedence:
 
-## Install (as a plugin marketplace)
+1. the title you set with `/rename` (e.g. `fix-auth-bug`),
+2. else the auto-generated summary title shown in the session list,
+3. else the early auto agent-name,
+4. else the working-directory basename.
 
-`notify` ships in the **`jakobmusik`** marketplace (this
-[`claude-code-plugins`](../../) repo). Add the marketplace once, then install this plugin:
+A mid-session `/rename` is reflected, and an explicit rename always wins over an auto-generated
+name.
 
-1. Push the marketplace repo to GitHub (see [Publish](#publish-your-copy)), then in Claude Code:
+`AskUserQuestion` is wired on `PreToolUse` (not `PermissionRequest`, which never fires for it),
+so the ping goes out the instant Claude poses the question — while it's still waiting on you.
 
-   ```
-   /plugin marketplace add JakobMusik/claude-code-plugins
-   /plugin install notify@jakobmusik
-   ```
+## Install
+`notify` is a Claude Code plugin shipped in the **`jakobmusik`** marketplace — the
+[`claude-code-plugins`](../../) repo, whose root `.claude-plugin/marketplace.json` catalogs it.
+Add the marketplace once, then install this plugin.
 
-   Or add the marketplace straight from a local clone:
+**From the hosted repo:**
 
-   ```
-   /plugin marketplace add /path/to/claude-code-plugins
-   /plugin install notify@jakobmusik
-   ```
+    /plugin marketplace add JakobMusik/claude-code-plugins
+    /plugin install notify@jakobmusik
 
-2. **Configure your private topic** — run the skill once:
+**From a local clone** — add the marketplace repo, then install:
 
-   ```
-   /notify
-   ```
+    /plugin marketplace add /path/to/claude-code-plugins
+    /plugin install notify@jakobmusik
 
-   It generates a private ntfy topic, sends a test notification, and prints a
-   `https://ntfy.sh/<topic>` URL.
+**For development** — load the working copy without installing (use `/reload-plugins` to pick up
+edits live):
 
-3. **Subscribe** to that URL in the [ntfy app](https://ntfy.sh) (iOS / Android) or the web
-   client. That's what delivers pushes to your phone.
+    claude --plugin-dir /path/to/claude-code-plugins/plugins/notify
 
-That's it. From then on, every Stop / AskUserQuestion / permission event in any session pings you.
+## Basic usage
+The plugin ships the hooks already declared; the only per-user setup is your **private ntfy
+topic** — the channel your phone subscribes to.
+
+**1. Configure the topic.** Run the skill once:
+
+    /notify
+
+It generates a private `claude-code-xxxxxxxx` topic (or accepts one you name), sends a test
+notification, and prints a `https://ntfy.sh/<topic>` subscribe URL. The topic is saved to
+`${XDG_CONFIG_HOME:-~/.config}/claude-code-notify/topic` — outside the plugin dir, so it
+survives updates and reinstalls.
+
+**2. Subscribe on your phone.** Open that URL in the [ntfy app](https://ntfy.sh) (iOS / Android)
+or the web client and subscribe. This is what actually delivers pushes — without it, nothing
+reaches your phone.
+
+**3. Activate the hooks.** They load when the plugin loads: run **`/reload-plugins`** (or start a
+fresh session). From then on, every Stop / AskUserQuestion / permission event in any session
+pings you.
+
+That's the whole setup. Re-run `/notify` anytime to see, change, or re-test the topic.
 
 ## How it works
-
-- The plugin ships `hooks/hooks.json`, which wires the three events to
-  `scripts/ntfy-notify.sh` via `${CLAUDE_PLUGIN_ROOT}`. These are **plugin hooks**, so they
-  fire session-wide and in every session — unlike skill *frontmatter* hooks, which the Claude
-  Code docs scope to a single turn ("cleaned up when it finishes") and would not work here.
+- The plugin's `hooks/hooks.json` wires the three events to `scripts/ntfy-notify.sh` via
+  `${CLAUDE_PLUGIN_ROOT}`. These are **plugin** hooks, so they fire session-wide and in every
+  future session — unlike skill *frontmatter* hooks, which Claude Code scopes to a single turn.
 - `ntfy-notify.sh` reads the hook JSON on stdin, derives the session name from the transcript,
   and POSTs it to `https://ntfy.sh/<your-topic>` with a title/emoji/priority per event. The
   curl is detached with tight timeouts, so it never delays Claude's turn.
-- Your topic is stored at `${XDG_CONFIG_HOME:-~/.config}/claude-code-notify/topic` — a stable
-  path outside the plugin dir, so it survives plugin updates and is identical whether the
-  script runs as a hook or a plain command. It is **never** committed.
 
 ## Privacy
-
 ntfy topics are **world-readable** — the topic name is the *only* thing keeping your messages
-private. `/notify` generates a random `claude-code-xxxxxxxx` topic by default; keep it secret
-and don't reuse a guessable/shared name. The script refuses to POST until a real topic is set,
-so the hooks are harmless no-ops before setup.
+private. `/notify` generates a random `claude-code-xxxxxxxx` topic by default; keep it secret and
+don't reuse a guessable or shared name. The script refuses to POST until a real topic is set, so
+the hooks are harmless no-ops before setup. The topic file is never committed.
 
 ## Requirements
-
-- `curl` and `jq` on `PATH` (standard on macOS/Linux).
+- `curl` on `PATH` to send (standard on macOS/Linux). Without it the hook fails silently.
+- `jq` on `PATH` to read the session name from the transcript — without it the body falls back to
+  the working-directory name.
 - Claude Code with plugin support.
 
 ## Managing it
+The script also runs standalone for topic management (`$SCRIPT` is
+`${CLAUDE_PLUGIN_ROOT}/scripts/ntfy-notify.sh` from an installed plugin):
 
-```bash
-# from an installed plugin, the script lives in the plugin cache; these also work standalone:
-notify/scripts/ntfy-notify.sh show-topic        # print current topic + subscribe URL
-notify/scripts/ntfy-notify.sh set-topic [NAME]  # set a topic (random if NAME omitted)
-notify/scripts/ntfy-notify.sh test              # send a test notification
+    "$SCRIPT" show-topic        # print the current topic + subscribe URL
+    "$SCRIPT" set-topic [NAME]  # set a topic (random if NAME omitted)
+    "$SCRIPT" test              # send a test notification
+
+- **Override the topic without editing config:** set `NTFY_TOPIC=<topic>` in the environment;
+  it wins over the stored file.
+- **Turn it off:** disable via the `/plugin` menu, or `claude plugin disable notify@jakobmusik`.
+- **Reload after editing `hooks/hooks.json`:** `/reload-plugins`.
+
+> **Avoid double notifications:** if you *also* drop this in as a bare skills-dir install
+> (`~/.claude/skills/notify/`) alongside the marketplace plugin, both register hooks and you'll
+> get every ping twice. Keep one copy.
+
+## Layout
 ```
-
-- **Override the topic without editing config:** set `NTFY_TOPIC=<topic>` in the environment.
-- **Turn it off:** `/plugin` → disable `notify`, or `claude plugin disable notify@claude-notify`.
-- **Reload after editing hooks:** `/reload-plugins`.
-
-> **Avoid double notifications:** if you also set this up as a manual skills-dir plugin
-> (`~/.claude/skills/notify/`), disable or remove one copy — otherwise both register hooks and
-> you'll get each ping twice.
-
-## Repo layout
-
+plugins/notify/
+├── .claude-plugin/plugin.json
+├── hooks/hooks.json          # Stop / PreToolUse(AskUserQuestion) / PermissionRequest
+├── scripts/ntfy-notify.sh    # posts to ntfy; body = session name
+├── SKILL.md                  # the /notify skill: configure topic, test, guide
+└── README.md
 ```
-claude-code-notify/
-├── .claude-plugin/marketplace.json   # the marketplace catalog (lists the notify plugin)
-├── plugins/notify/                   # the plugin itself
-│   ├── .claude-plugin/plugin.json
-│   ├── hooks/hooks.json              # Stop / PreToolUse(AskUserQuestion) / PermissionRequest
-│   ├── scripts/ntfy-notify.sh        # posts to ntfy; body = session name
-│   └── SKILL.md                      # /notify: configure topic, test, guide
-├── README.md
-└── LICENSE
-```
-
-## Publish your copy
-
-1. Edit `.claude-plugin/marketplace.json` (`owner.name`) and `LICENSE` (copyright) to your name.
-2. Create a GitHub repo and push:
-
-   ```bash
-   git remote add origin git@github.com:<your-user>/claude-code-notify.git
-   git push -u origin main
-   ```
-
-3. Share the install commands above (with your GitHub user) so others can add the marketplace.
 
 ## License
-
-MIT — see [LICENSE](LICENSE).
+MIT — see the repo-root [LICENSE](../../LICENSE).

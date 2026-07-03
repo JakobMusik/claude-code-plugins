@@ -7,7 +7,7 @@ description: >-
   "set up notifications", "notify me when Claude finishes / asks me something / needs permission",
   mentions "ntfy" or "push notifications", "alert me when the agent is done", or wants to
   (re)configure, change, or test the notification topic. The Stop / AskUserQuestion /
-  PermissionRequest hooks ship with this skill as a skills-dir plugin and fire session-wide;
+  PermissionRequest hooks ship with this skill as a bundled plugin and fire session-wide;
   invoking this skill configures the private ntfy topic and verifies delivery.
 allowed-tools: Bash
 ---
@@ -15,7 +15,7 @@ allowed-tools: Bash
 # notify — ntfy push notifications for Claude Code
 
 Ping the user's phone when a Claude Code session needs them. Three moments are wired, as
-**session-wide hooks bundled with this skill** (the `notify@skills-dir` plugin's
+**session-wide hooks bundled with this skill** (the `notify` plugin's
 `hooks/hooks.json`):
 
 | Event | Fires when | ntfy title / emoji / priority |
@@ -24,10 +24,11 @@ Ping the user's phone when a Claude Code session needs them. Three moments are w
 | `PreToolUse` (matcher `AskUserQuestion`) | Claude is asking the user a multiple-choice question | "Question for you" ❓ max |
 | `PermissionRequest` | Claude is blocked needing a tool approved | "Permission needed" 🔒 max |
 
-The notification **body is the session name** — the title set with `/rename` (e.g.
-`notify-skill-creation`), shown in the session list. If the session was never named, it falls
-back to the working-directory basename. The script reads it from the session transcript, so a
-mid-session `/rename` is reflected.
+The notification **body is the session name** — whatever the session list shows. The script
+reads it from the transcript by precedence: the title you set with `/rename` (e.g.
+`notify-skill-creation`) wins; else the auto-generated summary title; else the early agent name;
+else the working-directory basename. A mid-session `/rename` is reflected, and it never sends a
+stale auto name over one you set yourself.
 
 Because these are **plugin** hooks (not skill-frontmatter hooks, which would only live for one
 turn), they fire on every Stop / AskUserQuestion / permission event for the whole session and in
@@ -46,7 +47,9 @@ path — `${XDG_CONFIG_HOME:-~/.config}/claude-code-notify/topic` — so it is s
 install method and survives plugin updates.
 
 ```bash
-SCRIPT="$HOME/.claude/skills/notify/scripts/ntfy-notify.sh"   # this skill's bundled script
+# ${CLAUDE_PLUGIN_ROOT} is set when this runs as a marketplace/`--plugin-dir` plugin;
+# the fallback covers a bare skills-dir install (~/.claude/skills/notify/).
+SCRIPT="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/skills/notify}/scripts/ntfy-notify.sh"
 chmod +x "$SCRIPT"
 ```
 
@@ -72,7 +75,7 @@ chmod +x "$SCRIPT"
    notification arrived. If it didn't, check `curl`/network and that they subscribed to the exact
    topic.
 
-5. **Activate the hooks.** The bundled hooks load when the `notify@skills-dir` plugin loads —
+5. **Activate the hooks.** The bundled hooks load when the `notify` plugin loads —
    on a fresh session, or after **`/reload-plugins`** in the current one. Tell the user to run
    `/reload-plugins` (or restart Claude Code) so the Stop / AskUserQuestion / PermissionRequest
    hooks take effect now. (Editing `hooks/hooks.json` later also requires `/reload-plugins`.)
@@ -82,7 +85,9 @@ and that the message body is the session name.
 
 ## Prerequisites
 
-- `curl` and `jq` on `PATH` (both standard on macOS/Linux). The hook fails silent if missing.
+- `curl` is required to send; without it the hook just fails silently. `jq` reads the session
+  name from the transcript — without it the body falls back to the working-directory name. Both
+  are standard on macOS/Linux.
 - The topic must be set — the script refuses to POST without a real topic, so the hooks are
   harmless no-ops until `/notify` configures one.
 
@@ -92,7 +97,8 @@ and that the message body is the session name.
 - **Re-test:** `"$SCRIPT" test`
 - **Override without touching the file:** set `NTFY_TOPIC=<topic>` in the environment; it wins
   over the stored topic.
-- **Turn it off:** `claude plugin disable notify@skills-dir`, or delete
-  `~/.claude/skills/notify/`. Re-enable with `claude plugin enable notify@skills-dir`.
+- **Turn it off:** `claude plugin disable notify@jakobmusik` (or via the `/plugin` menu).
+  Re-enable with `claude plugin enable notify@jakobmusik`. For a bare skills-dir install,
+  delete `~/.claude/skills/notify/` instead.
 - **Manual test wiring:** the hooks call `ntfy-notify.sh stop|askuserquestion|permission_request`
   with the hook JSON on stdin.
