@@ -1,0 +1,9 @@
+# macOS
+.DS_Store
+
+# Never commit a private ntfy topic (it lives in ~/.config, but be defensive)
+.ntfy-topic
+*.ntfy-topic
+
+# Local Claude Code worktrees / scratch
+.claude/worktrees/

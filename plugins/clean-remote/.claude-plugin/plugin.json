@@ -1,0 +1,8 @@
+{
+  "name": "clean-remote",
+  "description": "Keep planning and agent-helper files tracked locally with full history while publishing a clean public remote. Maintains a private working branch and publishes one clean, scrubbed commit on top of the remote tip (incrementally, preserving external commits); a pre-push hook makes the exclusion enforced, not just habitual.",
+  "version": "0.1.3",
+  "author": {
+    "name": "jakobmusik"
+  }
+}
