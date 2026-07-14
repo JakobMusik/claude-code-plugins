@@ -2,8 +2,8 @@
 
 Phone push notifications for [Claude Code](https://code.claude.com), delivered through
 [ntfy.sh](https://ntfy.sh). Get pinged the moment a session needs you — the notification is
-titled **`<session name>@<project>`** and its body is **Claude's latest reply**, so you know
-*which* session and *what it said* without opening your laptop.
+titled **`<session name>@<project>@<user>`** and its body is **your last message**, so you know
+*which* session and *what you asked it* without opening your laptop.
 
 ## What it does
 Three moments are wired as **session-wide hooks** that ship with the plugin. Every one sends the
@@ -15,18 +15,20 @@ same shape; the emoji and priority tell them apart:
 | `PreToolUse` (`AskUserQuestion`) | Claude is asking you a multiple-choice question | ❓ max |
 | `PermissionRequest` | Claude is blocked, needing you to approve a tool | 🔒 max |
 
-**Title — `<session name>@<cwd>`.** The session name is read from the transcript by precedence:
+**Title — `<session name>@<cwd>@<user>`.** The session name is read from the transcript by
+precedence:
 
 1. the title you set with `/rename` (e.g. `fix-auth-bug`),
 2. else the auto-generated summary title shown in the session list,
 3. else the early auto agent-name.
 
-`<cwd>` is the working-directory basename, so the title reads e.g. `fix-auth-bug@myapp`. A
-mid-session `/rename` is reflected, and an explicit rename always wins over an auto name.
+`<cwd>` is the working-directory basename and `<user>` is the OS username, so the title reads
+e.g. `fix-auth-bug@myapp@alice`. A mid-session `/rename` is reflected, and an explicit rename
+always wins over an auto name.
 
-**Body — Claude's latest reply.** The first few lines of the last assistant message (long
-replies are truncated with an `…`). If that turn was a bare tool call with no prose, the body
-falls back to the title.
+**Body — your last message.** The first few lines of the most recent real user prompt in the
+transcript (long messages are truncated with an `…`); tool results and slash-command plumbing
+don't count. If the session has no prompt yet, the body falls back to the title.
 
 `AskUserQuestion` is wired on `PreToolUse` (not `PermissionRequest`, which never fires for it),
 so the ping goes out the instant Claude poses the question — while it's still waiting on you.
@@ -80,7 +82,7 @@ That's the whole setup. Re-run `/notify` anytime to see, change, or re-test the 
   `${CLAUDE_PLUGIN_ROOT}`. These are **plugin** hooks, so they fire session-wide and in every
   future session — unlike skill *frontmatter* hooks, which Claude Code scopes to a single turn.
 - `ntfy-notify.sh` reads the hook JSON on stdin, finds the transcript, and from it composes the
-  title (`<session name>@<cwd>`) and body (Claude's latest reply), then POSTs to
+  title (`<session name>@<cwd>@<user>`) and body (the user's last message), then POSTs to
   `https://ntfy.sh/<your-topic>` with the event's emoji and priority. The curl is detached with
   tight timeouts, so it never delays Claude's turn.
 
@@ -127,8 +129,8 @@ the hooks are harmless no-ops before setup. The topic file is never committed.
 
 ## Requirements
 - `curl` on `PATH` to send (standard on macOS/Linux). Without it the hook fails silently.
-- `jq` on `PATH` to read the session name from the transcript — without it the body falls back to
-  the working-directory name.
+- `jq` on `PATH` to read the session name and your last message from the transcript — without it
+  the notification falls back to `<cwd>@<user>` for both title and body.
 - Claude Code with plugin support.
 
 These cover the phone hooks. The optional **macOS desktop receiver** has *additional* deps — most
@@ -157,7 +159,7 @@ The script also runs standalone for topic management (`$SCRIPT` is
 plugins/notify/
 ├── .claude-plugin/plugin.json
 ├── hooks/hooks.json               # Stop / PreToolUse(AskUserQuestion) / PermissionRequest
-├── scripts/ntfy-notify.sh         # sender: posts to ntfy; title=session, body=latest reply
+├── scripts/ntfy-notify.sh         # sender: posts to ntfy; title=session@cwd@user, body=last user msg
 ├── desktop/                       # optional macOS receiver (subscribes → native banners)
 │   ├── claude-code-ntfy.sh        #   the standalone command
 │   └── README.md

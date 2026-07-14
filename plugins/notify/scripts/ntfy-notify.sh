@@ -8,10 +8,11 @@
 #     permission_request  Claude is blocked, needing you to approve a tool    (PermissionRequest)
 #
 # For a session event the notification is composed from the transcript as:
-#     Title:  "<session name>@<cwd>" — the /rename title if set, else the
-#             auto-generated summary title, joined with the working-dir basename.
-#     Body:   the first few lines of Claude's latest reply (the last assistant
-#             message's text), or the title if that turn carried no prose.
+#     Title:  "<session name>@<cwd>@<user>" — the /rename title if set, else
+#             the auto-generated summary title, joined with the working-dir
+#             basename and the OS username.
+#     Body:   the user's last message (the most recent real prompt in the
+#             transcript), or the title if none exists yet.
 # Which event fired is still encoded by the Tags (emoji) and Priority. Reads the
 # hook JSON on stdin.
 #
@@ -87,23 +88,29 @@ session_title() {  # session_title <transcript>
         | .c // .a // .g // empty' "$1" 2>/dev/null
 }
 
-# Body: the first few lines of Claude's most recent reply — the text blocks of
-# the last assistant message (thinking / tool_use blocks are skipped). Empty when
-# the latest turns carried no prose (e.g. a bare tool call); the caller then falls
-# back to the title so the notification is never blank.
-REPLY_MAX_LINES=4
-REPLY_MAX_CHARS=500
-latest_reply() {  # latest_reply <transcript>
+# Body: the user's most recent message — the last real user prompt in the
+# transcript. Not everything typed as role=user is a prompt: tool results, meta
+# records, and slash-command plumbing (<command-*> wrappers, <local-command-stdout>,
+# system reminders, interrupt markers) are skipped. Empty when the session has
+# no real prompt yet; the caller then falls back to the title so the
+# notification is never blank.
+BODY_MAX_LINES=4
+BODY_MAX_CHARS=500
+last_user_message() {  # last_user_message <transcript>
     local text
     [ -n "${1:-}" ] && [ -f "$1" ] || return 0
     text="$(jq -rn '
         [ inputs
-          | select(.type=="assistant" and .message.role=="assistant")
-          | ([.message.content[]? | select(.type=="text") | .text] | join("\n"))
-          | select(. != null and (gsub("\\s"; "") | length > 0))
+          | select(.type=="user" and .message.role=="user" and ((.isMeta // false) | not))
+          | .message.content
+          | if type=="string" then .
+            elif type=="array" then ([.[]? | select(.type=="text") | .text] | join("\n"))
+            else "" end
+          | select(gsub("\\s"; "") | length > 0)
+          | select(test("^\\s*(<command-|<local-command-stdout>|<system-reminder>|\\[Request interrupted)") | not)
         ] | last // ""' "$1" 2>/dev/null)"
     [ -n "$text" ] || return 0
-    printf '%s' "$text" | awk -v m="$REPLY_MAX_LINES" -v c="$REPLY_MAX_CHARS" '
+    printf '%s' "$text" | awk -v m="$BODY_MAX_LINES" -v c="$BODY_MAX_CHARS" '
         NF { line[++n] = $0 } n >= m { exit }
         END {
             body = ""
@@ -113,10 +120,11 @@ latest_reply() {  # latest_reply <transcript>
         }'
 }
 
-# Read the hook JSON once, compose "<name>@<cwd>" for the title and the latest
-# reply for the body, and fire. Priority + emoji tags (args) still mark the event.
+# Read the hook JSON once, compose "<name>@<cwd>@<user>" for the title and the
+# user's last message for the body, and fire. Priority + emoji tags (args) still
+# mark the event.
 notify_event() {  # notify_event <priority> <tags>
-    local input="" transcript cwd base name title body
+    local input="" transcript cwd base name user title body
     [ -t 0 ] || input="$(cat)"
     transcript="$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)"
     cwd="$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)"
@@ -128,8 +136,10 @@ notify_event() {  # notify_event <priority> <tags>
     elif [ -n "$base" ];                   then title="$base"
     else                                        title="claude session"
     fi
+    user="$(id -un 2>/dev/null)"; [ -n "$user" ] || user="${USER:-${LOGNAME:-}}"
+    [ -n "$user" ] && title="${title}@${user}"
     title="$(printf '%s' "$title" | tr -d '\r\n')"   # Title is an HTTP header: single line
-    body="$(latest_reply "$transcript")"
+    body="$(last_user_message "$transcript")"
     [ -n "$body" ] || body="$title"
     post_bg "$title" "$1" "$2" "$body"
 }

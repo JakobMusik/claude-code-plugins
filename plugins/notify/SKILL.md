@@ -3,8 +3,8 @@ name: notify
 description: >-
   Set up phone push notifications (via ntfy.sh) for Claude Code on this machine, so the user
   gets pinged when Claude stops and is awaiting them, asks them a multiple-choice question, or
-  hits a permission prompt — titled with the session name and directory, with Claude's latest
-  reply as the message. Use when the user wants to
+  hits a permission prompt — titled with the session name, directory, and OS user, with the
+  user's last message as the body. Use when the user wants to
   "set up notifications", "notify me when Claude finishes / asks me something / needs permission",
   mentions "ntfy" or "push notifications", "alert me when the agent is done", or wants to
   (re)configure, change, or test the notification topic. The Stop / AskUserQuestion /
@@ -28,13 +28,15 @@ Ping the user's phone when a Claude Code session needs them. Three moments are w
 Every notification carries the same shape; the emoji (ntfy Tags) and priority above tell the
 events apart:
 
-- **Title = `<session name>@<cwd>`.** The session name is read from the transcript by precedence —
-  the title you set with `/rename` (e.g. `notify-skill-creation`) wins, else the auto-generated
-  summary title, else the early agent name; it never sends a stale auto name over one you set
-  yourself, and a mid-session `/rename` is reflected. `<cwd>` is the working-directory basename,
-  so the title reads e.g. `fix-auth-bug@myapp` — *which* task in *which* project at a glance.
-- **Body = the first few lines of Claude's latest reply** (the last assistant message's text).
-  If that turn carried no prose (a bare tool call), the body falls back to the title.
+- **Title = `<session name>@<cwd>@<user>`.** The session name is read from the transcript by
+  precedence — the title you set with `/rename` (e.g. `notify-skill-creation`) wins, else the
+  auto-generated summary title, else the early agent name; it never sends a stale auto name over
+  one you set yourself, and a mid-session `/rename` is reflected. `<cwd>` is the working-directory
+  basename and `<user>` is the OS username, so the title reads e.g. `fix-auth-bug@myapp@alice` —
+  *which* task in *which* project on *whose* machine at a glance.
+- **Body = the user's last message** (the most recent real prompt in the transcript — tool
+  results and slash-command plumbing don't count). If the session has no prompt yet, the body
+  falls back to the title.
 
 Because these are **plugin** hooks (not skill-frontmatter hooks, which would only live for one
 turn), they fire on every Stop / AskUserQuestion / permission event for the whole session and in
@@ -126,15 +128,15 @@ chmod +x "$SCRIPT"
    and run instructions are in the plugin's `desktop/README.md`.
 
 Finish by summarizing: the topic + subscribe URL, that a test was sent, the three wired events,
-and the notification shape — title `<session name>@<cwd>`, body the first lines of Claude's
-latest reply. On macOS, if the user wants desktop banners too, point them at the copy command in
+and the notification shape — title `<session name>@<cwd>@<user>`, body the user's last message.
+On macOS, if the user wants desktop banners too, point them at the copy command in
 step 6 and the plugin's `desktop/` folder.
 
 ## Prerequisites
 
 - `curl` is required to send; without it the hook just fails silently. `jq` reads the session
-  name from the transcript — without it the body falls back to the working-directory name. Both
-  are standard on macOS/Linux.
+  name and the user's last message from the transcript — without it the notification falls back
+  to `<cwd>@<user>` for both title and body. Both are standard on macOS/Linux.
 - The topic must be set — the script refuses to POST without a real topic, so the hooks are
   harmless no-ops until `/notify` configures one.
 
