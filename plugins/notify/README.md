@@ -62,10 +62,12 @@ topic** — the channel your phone subscribes to.
     /notify
 
 It generates a private `claude-code-xxxxxxxx` topic (or accepts one you name), sends a test
-notification, and prints a `https://ntfy.sh/<topic>` subscribe URL. The topic is saved **inside
-the plugin** at `<plugin>/.config/topic`, so it's self-contained: uninstalling the plugin (or a
-reinstall/update that replaces the plugin folder) removes it too — just re-run `/notify` to set
-it again.
+notification, and prints a `https://ntfy.sh/<topic>` subscribe URL. The topic is saved in the
+plugin's **persistent data directory** (`$CLAUDE_PLUGIN_DATA`, e.g.
+`~/.claude/plugins/data/notify-<marketplace>/topic`), so it **survives plugin updates** — no
+re-setup after a version bump. A topic stored by an older version (< 0.3.0) inside the
+version-stamped plugin folder is migrated forward automatically on first use. (A bare skills-dir
+install keeps it at `<plugin>/.config/topic` instead, which isn't version-stamped either.)
 
 **2. Subscribe on your phone.** Open that URL in the [ntfy app](https://ntfy.sh) (iOS / Android)
 or the web client and subscribe. This is what actually delivers pushes — without it, nothing
@@ -147,6 +149,9 @@ The script also runs standalone for topic management (`$SCRIPT` is
 
 - **Override the topic without editing config:** set `NTFY_TOPIC=<topic>` in the environment;
   it wins over the stored file.
+- **Forget the topic:** delete `~/.claude/plugins/data/notify-<marketplace>/topic` — the data
+  dir outlives updates (and possibly uninstalls) by design, so removing the plugin alone no
+  longer discards it.
 - **Turn it off:** disable via the `/plugin` menu, or `claude plugin disable notify@jakobmusik`.
 - **Reload after editing `hooks/hooks.json`:** `/reload-plugins`.
 

@@ -24,14 +24,22 @@
 # Topic resolution (first hit wins):
 #     1. $NTFY_TOPIC
 #     2. $NTFY_TOPIC_FILE       (path override, if set)
-#     3. <plugin>/.config/topic (written by `set-topic`)
-# The topic file lives INSIDE the plugin folder — <plugin> is this script's own
-# plugin dir (scripts/..), resolved from the script's location so it is found
-# identically as a hook or as a plain command. That .config/ dir is removed when
-# the plugin is uninstalled, and wiped when the plugin is replaced on update, so
-# the topic is intentionally temporary: re-run /notify after a reinstall. ntfy
-# topics are world-readable, so the topic name is the ONLY privacy boundary:
-# there is no shared default and the script refuses to POST without one.
+#     3. <data-dir>/topic       (written by `set-topic`)
+# <data-dir> is the plugin's PERSISTENT data directory, so the topic survives
+# plugin updates (the install folder itself is version-stamped and replaced on
+# every update):
+#     - $CLAUDE_PLUGIN_DATA when the loader provides it (hooks always get it),
+#     - else derived as <plugins>/data/<plugin>-<marketplace> when this script
+#       runs from a marketplace cache (…/plugins/cache/<mkt>/<plugin>/<version>),
+#       so plain-command runs land on the same file as the hooks,
+#     - else <plugin>/.config for a bare skills-dir install, which is not
+#       version-stamped in the first place.
+# Topics written by versions < 0.3.0 lived inside the version-stamped plugin
+# folder and were lost on update; read_topic adopts the newest one it finds
+# there (or in a sibling version's folder) the first time the persistent file
+# is missing. ntfy topics are world-readable, so the topic name is the ONLY
+# privacy boundary: there is no shared default and the script refuses to POST
+# without one.
 
 set -u
 
@@ -39,12 +47,49 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # Plugin root = this script's dir minus scripts/. Prefer the loader-provided
 # ${CLAUDE_PLUGIN_ROOT} when set; both point at the same plugin folder.
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
-DEFAULT_TOPIC_FILE="$PLUGIN_ROOT/.config/topic"
+LEGACY_TOPIC_FILE="$PLUGIN_ROOT/.config/topic"
+
+# Marketplace cache layout: …/plugins/cache/<marketplace>/<plugin>/<version>.
+CACHE_DIR="$(dirname "$(dirname "$(dirname "$PLUGIN_ROOT")")")"
+IS_CACHE_LAYOUT=0
+if [ "$(basename "$CACHE_DIR")" = "cache" ] && [ "$(basename "$(dirname "$CACHE_DIR")")" = "plugins" ]; then
+    IS_CACHE_LAYOUT=1
+fi
+
+if [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then
+    DATA_DIR="$CLAUDE_PLUGIN_DATA"
+elif [ "$IS_CACHE_LAYOUT" = 1 ]; then
+    DATA_DIR="$(dirname "$CACHE_DIR")/data/$(basename "$(dirname "$PLUGIN_ROOT")")-$(basename "$(dirname "$(dirname "$PLUGIN_ROOT")")")"
+else
+    DATA_DIR="$PLUGIN_ROOT/.config"
+fi
+DEFAULT_TOPIC_FILE="$DATA_DIR/topic"
 TOPIC_FILE="${NTFY_TOPIC_FILE:-$DEFAULT_TOPIC_FILE}"
 PLACEHOLDER="REPLACE_ME_WITH_A_PRIVATE_NTFY_TOPIC"
 
+# One-time heal for topics stored by versions < 0.3.0 inside the version-stamped
+# plugin folder: adopt the newest legacy file into the persistent location. The
+# legacy file is left in place — the next update removes it anyway.
+migrate_legacy_topic() {
+    local f best=""
+    [ "$TOPIC_FILE" = "$DEFAULT_TOPIC_FILE" ] || return 0        # respect $NTFY_TOPIC_FILE
+    [ "$DEFAULT_TOPIC_FILE" = "$LEGACY_TOPIC_FILE" ] && return 0 # bare install: same file
+    if [ "$IS_CACHE_LAYOUT" = 1 ]; then
+        for f in "$(dirname "$PLUGIN_ROOT")"/*/.config/topic; do
+            [ -f "$f" ] || continue
+            if [ -z "$best" ] || [ "$f" -nt "$best" ]; then best="$f"; fi
+        done
+    elif [ -f "$LEGACY_TOPIC_FILE" ]; then
+        best="$LEGACY_TOPIC_FILE"
+    fi
+    [ -n "$best" ] || return 0
+    mkdir -p "$DATA_DIR" 2>/dev/null || return 0
+    cp "$best" "$TOPIC_FILE" 2>/dev/null && chmod 600 "$TOPIC_FILE" 2>/dev/null || true
+}
+
 read_topic() {
     if [ -n "${NTFY_TOPIC:-}" ]; then printf '%s' "$NTFY_TOPIC"; return 0; fi
+    [ -f "$TOPIC_FILE" ] || migrate_legacy_topic
     if [ -f "$TOPIC_FILE" ]; then tr -d ' \t\r\n' < "$TOPIC_FILE" 2>/dev/null; fi
 }
 

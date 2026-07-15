@@ -50,10 +50,12 @@ every future session — once the plugin is loaded.
 ## What invoking `/notify` does
 
 The hooks are already declared; the only per-user setup is the **ntfy topic** (the private
-channel your phone subscribes to). Run these steps. The topic is stored **inside the plugin
-folder** at `<plugin>/.config/topic` (the script derives `<plugin>` from its own location). That
-`.config/` folder is removed when the plugin is uninstalled and wiped when it's replaced on
-update, so the topic is deliberately temporary — re-run `/notify` after a reinstall.
+channel your phone subscribes to). Run these steps. The topic is stored in the plugin's
+**persistent data directory** (`$CLAUDE_PLUGIN_DATA`, e.g.
+`~/.claude/plugins/data/notify-<marketplace>/topic`; a bare skills-dir install keeps it at
+`<plugin>/.config/topic` instead), so it **survives plugin updates**. A topic stored by an older
+plugin version (< 0.3.0) inside the version-stamped plugin folder is adopted into the persistent
+location automatically on first read — after an update, step 1 should find it already configured.
 
 ```bash
 # ${CLAUDE_PLUGIN_ROOT} is set when this runs as a marketplace/`--plugin-dir` plugin;
